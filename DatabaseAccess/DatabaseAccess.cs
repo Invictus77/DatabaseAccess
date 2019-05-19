@@ -4,16 +4,16 @@ using System.ComponentModel;
 using System.Data;
 using System.Linq;
 using System.Reflection;
-using DataAccess.Attributes;
+using DatabaseAccess.Attributes;
 
-namespace DataAccess
+namespace DatabaseAccess
 {
-    public class DataAccess : FieldEvaluator
+    public class DatabaseAccess : FieldEvaluator
     {
         private Provider _provider;
         private string _connectionString;
 
-        public DataAccess(Provider provider, string connectionString)
+        public DatabaseAccess(Provider provider, string connectionString)
         {
             _provider = provider;
             if (string.IsNullOrEmpty(connectionString)) _connectionString = @"Driver={Microsoft Access Driver (*.mdb, *.accdb)};Dbq=C:\Users\BRWO.AURIS-AT\OneDrive\Unternehmen\Ing. Wolfgang Bräu\Waizinger\Webservice\GitHub\TransportWebService\TransportWebService\Database\daten.mdb;";

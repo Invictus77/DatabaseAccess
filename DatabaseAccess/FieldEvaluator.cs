@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Reflection;
 
-namespace DataAccess
+namespace DatabaseAccess
 {
     /// <summary>
     /// 
