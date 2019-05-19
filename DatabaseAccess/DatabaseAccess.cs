@@ -255,7 +255,7 @@ namespace DatabaseAccess
 
         private IDbConnection GetConnection()
         {
-            if (_provider == Provider.ODBC)
+            if (_provider == Provider.MsAccess)
                 return new System.Data.Odbc.OdbcConnection(_connectionString);
             throw new NotImplementedException();
         }
@@ -263,7 +263,8 @@ namespace DatabaseAccess
         public enum Provider
         {
             SqlClient = 0,
-            ODBC = 1
+            SqLite = 1,
+            MsAccess = 2
         }
     }
 }
