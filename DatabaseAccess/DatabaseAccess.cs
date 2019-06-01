@@ -8,15 +8,23 @@ using DatabaseAccess.Attributes;
 
 namespace DatabaseAccess
 {
+    /// <summary>
+    /// 
+    /// </summary>
     public class DatabaseAccess : FieldEvaluator
     {
         private Provider _provider;
         private string _connectionString;
 
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="provider"></param>
+        /// <param name="connectionString"></param>
         public DatabaseAccess(Provider provider, string connectionString)
         {
             _provider = provider;
-            if (string.IsNullOrEmpty(connectionString)) _connectionString = @"Driver={Microsoft Access Driver (*.mdb, *.accdb)};Dbq=C:\Users\BRWO.AURIS-AT\OneDrive\Unternehmen\Ing. Wolfgang Bräu\Waizinger\Webservice\GitHub\TransportWebService\TransportWebService\Database\daten.mdb;";
+            if (string.IsNullOrEmpty(connectionString)) throw new ArgumentNullException(nameof(connectionString));
             else _connectionString = connectionString;
             //Driver={Microsoft Access Driver (*.mdb)};Dbq=C:\mydatabase.mdb;Uid=Admin;Pwd=
         }
