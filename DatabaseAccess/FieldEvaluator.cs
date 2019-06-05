@@ -43,7 +43,7 @@ namespace DatabaseAccess
         /// <returns></returns>
         public static TData GetValue<TData>(object value, TData defaultValue, Type propertyType)
         {
-            if (value == null) return defaultValue;
+            if (value == null || value is DBNull) return defaultValue;
             if (typeof(TData).GetTypeInfo().IsEnum)
             {
                 try
