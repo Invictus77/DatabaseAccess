@@ -202,7 +202,7 @@ namespace DatabaseAccess
 
         public void ExecuteNonQueryInsert<DataType>(List<DataType> records, string tableName)
         {
-            ExecuteNonQueryInsert(records, tableName);
+            ExecuteNonQueryInsert(null, records, tableName);
         }
 
         public void ExecuteNonQueryInsert<DataType>(DbTransaction transaction, List<DataType> records, string tableName)
@@ -384,7 +384,7 @@ namespace DatabaseAccess
         {
             if (parameters == null || parameters.Length == 0) return null;
             List<DbParameter> parameterList = new List<DbParameter>();
-            Regex parameterResolver = new Regex(string.Concat(@"\@([^=<>\s\']+)", _provider == Provider.MsAccess ? @"|\?" : "")); // for access allow also ? parameters
+            Regex parameterResolver = new Regex(string.Concat(@"\@([^=<>\s\',\)]+)", _provider == Provider.MsAccess ? @"|\?" : "")); // for access allow also ? parameters
             List<string> parameterNames = new List<string>();
             foreach (Match match in parameterResolver.Matches(commandText))
                 parameterNames.Add(match.Value);
