@@ -21,15 +21,15 @@ namespace DatabaseAccess
         private Provider _provider;
         private string _connectionString;
         private DbConnection _connection;
-        private bool _closeConnection;
         #endregion
 
         #region Constructor
         /// <summary>
         /// Constructor.
         /// </summary>
-        /// <param name="provider"></param>
-        /// <param name="connectionString"></param>
+        /// <param name="provider">The <see cref="Provider"/> enum to define which type of database will be connected.</param>
+        /// <param name="connectionString">A string representing the connection string to access the database.</param>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="connectionString"/> is set to null or empty string.</exception>
         public DatabaseAccess(Provider provider, string connectionString)
         {
             if (string.IsNullOrEmpty(connectionString)) throw new ArgumentNullException(nameof(connectionString));
@@ -40,9 +40,12 @@ namespace DatabaseAccess
         /// <summary>
         /// Constructor.
         /// </summary>
-        /// <param name="provider"></param>
-        /// <param name="databaseFilepath"></param>
-        /// <param name="createDatabase"></param>
+        /// <param name="provider">The <see cref="Provider"/> enum to define which type of database will be connected.</param>
+        /// <param name="databaseFilepath"></param<param name="connectionString">A string representing the connection string to access the database.</param>
+        /// <param name="exclusive">True if the database should be opened in an exclusive way (restricted access); otherwise false.</param>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="databaseFilepath"/> parameter is set to null or empty string.</exception>
+        /// <exception cref="System.IO.FileNotFoundException">Thrown if the given database (<paramref name="databaseFilepath"/>) does not exist.</exception>
+        /// <exception cref="InvalidOperationException">Thrown if given provider matches <see cref="Provider.SqlClient"/>. This is not supported.</exception>
         public DatabaseAccess(Provider provider, string databaseFilepath, bool exclusive)
         {
             if (_provider == Provider.SqlClient) throw new InvalidOperationException("SqlClient does not support databaseFilePath.");
@@ -64,11 +67,12 @@ namespace DatabaseAccess
         /// <summary>
         /// Constructor.
         /// </summary>
-        /// <param name="provider"></param>
-        /// <param name="connection"></param>
+        /// <param name="provider">The <see cref="Provider"/> enum to define which type of database will be connected.</param>
+        /// <param name="connection">An object derived from <see cref="DbConnection"/> representing the connection to use.</param>
         public DatabaseAccess(Provider provider, DbConnection connection)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _provider = provider;
         }
 
         /// <summary>
@@ -225,12 +229,17 @@ namespace DatabaseAccess
                     ExecuteNonQuery(transaction, $"INSERT INTO {tableName} ({string.Join(",", fieldList.ToArray())}) VALUES ({string.Join(",", parameterList.ToArray())})", valueList.ToArray());
             }
         }
-
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="DataType"></typeparam>
+        /// <param name="records"></param>
+        /// <param name="updateCommand"></param>
+        /// <param name="parameters"></param>
         public void ExecuteNonQueryUpdate<DataType>(List<DataType> records, string updateCommand, params object[] parameters)
         {
             ExecuteNonQueryUpdate(null, records, updateCommand, parameters);
         }
-
         /// <summary>
         /// UPDATE Table SET {fieldList} WHERE y = 3
         /// </summary>
@@ -313,29 +322,12 @@ namespace DatabaseAccess
                 return command.ExecuteScalar();
             }, parameters);
         }
-        #endregion
 
-        #region Private methods
-
-        private void ExecuteString(IDataReader reader, List<string> list)
-        {
-            list.Add(reader[0].ToString());
-        }
-
-        private void ExecuteMapping<DataType>(IDataReader reader, List<DataType> list)
-        {
-            Type t = typeof(DataType);
-            DataType mapObject = Activator.CreateInstance<DataType>();
-
-            _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
-            {
-                if (FieldExists(reader, fieldName))
-                    propInfo.SetValue(mapObject, GetValue(reader.GetValue(reader.GetOrdinal(fieldName)), defaultValue, propertyType));
-            });
-
-            list.Add(mapObject);
-        }
-
+        /// <summary>
+        /// Returns all fields which will be evaluated by the object mapper.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the object to be analyzed.</typeparam>
+        /// <returns>A <see cref="List{T}"/> containing all fields which will be evaluated by the object mapper separated with comma.</returns>
         public List<string> GetFieldList<DataType>()
         {
             List<string> fieldList = new List<string>();
@@ -346,12 +338,19 @@ namespace DatabaseAccess
 
             return fieldList;
         }
-
+        /// <summary>
+        /// Returns all fields which will be evaluated by the object mapper separated with comma.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the object to be analyzed.</typeparam>
+        /// <returns>A string representing all fields which will be evaluated by the object mapper separated with comma.</returns>
         public string GetFieldListString<DataType>()
         {
             return string.Join(", ", GetFieldList<DataType>());
         }
-
+        /// <summary>
+        /// Returns the current connection. If no current connection exists a new one will be created.
+        /// </summary>
+        /// <returns>An object derived from <see cref="DbConnection"/> representing the current or a new connection.</returns>
         public DbConnection GetConnection()
         {
             if (_connection != null) return _connection;
@@ -360,7 +359,6 @@ namespace DatabaseAccess
                 return new System.Data.Odbc.OdbcConnection(_connectionString);
             throw new NotImplementedException();
         }
-
         /// <summary>
         /// Returns an emptry string if object is null or the string representation of the object. 
         /// </summary>
@@ -371,7 +369,6 @@ namespace DatabaseAccess
             if (value == null) return "";
             return value.ToString();
         }
-
         /// <summary>
         /// Creates a parameter array out of an array of object parameters.
         /// </summary>
@@ -407,6 +404,37 @@ namespace DatabaseAccess
         public virtual void ProcessPlatformSpecificParameter(DbParameter parameter, object value)
         {
             parameter.Value = value;
+        }
+        #endregion
+
+        #region Private methods
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="list"></param>
+        private void ExecuteString(IDataReader reader, List<string> list)
+        {
+            list.Add(reader[0].ToString());
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="DataType"></typeparam>
+        /// <param name="reader"></param>
+        /// <param name="list"></param>
+        private void ExecuteMapping<DataType>(IDataReader reader, List<DataType> list)
+        {
+            Type t = typeof(DataType);
+            DataType mapObject = Activator.CreateInstance<DataType>();
+
+            _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
+            {
+                if (FieldExists(reader, fieldName))
+                    propInfo.SetValue(mapObject, GetValue(reader.GetValue(reader.GetOrdinal(fieldName)), defaultValue, propertyType));
+            });
+
+            list.Add(mapObject);
         }
 
         private void _ProcessProperties<DataType>(ProcessProperty func)
