@@ -124,9 +124,9 @@ namespace DatabaseAccess
             return connection.BeginTransaction(il);
         }
         /// <summary>
-        /// 
+        /// Rolls back the given transaction.
         /// </summary>
-        /// <param name="transaction"></param>
+        /// <param name="transaction">The transaction to roll back.</param>
         public void RollBackTransaction(IDbTransaction transaction)
         {
             transaction.Rollback();
@@ -204,37 +204,86 @@ namespace DatabaseAccess
             return ExecuteReaderObject<DataType>(transaction, sqlCommand, new ExecuteMappingDelegate<DataType>(this.ExecuteMapping), parameters);
         }
 
+        /// <summary>
+        /// Inserts the given objects into the given table.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the object to be inserted in the table.</typeparam>
+        /// <param name="records">A list of objects to insert into the database.</param>
+        /// <param name="tableName">A string representing the name of the table where the records should be inserted.</param>
         public void ExecuteNonQueryInsert<DataType>(List<DataType> records, string tableName)
         {
             ExecuteNonQueryInsert(null, records, tableName);
         }
 
+        /// <summary>
+        /// Inserts the given objects into the given table.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the object to be inserted in the table.</typeparam>
+        /// <param name="transaction">A <see cref="DbTransaction"/> object representing the transaction for this query.</param>
+        /// <param name="records">A list of objects to insert into the database.</param>
+        /// <param name="tableName">A string representing the name of the table where the records should be inserted.</param>
         public void ExecuteNonQueryInsert<DataType>(DbTransaction transaction, List<DataType> records, string tableName)
         {
             foreach (DataType record in records)
-            {
-                List<string> fieldList = new List<string>();
-                List<string> parameterList = new List<string>();
-                List<object> valueList = new List<object>();
+                ExecuteNonQueryInsert(transaction, record, tableName);
+        }
+        /// <summary>
+        /// Inserts the given object into the given table.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the object to be inserted in the table.</typeparam>
+        /// <param name="transaction">A <see cref="DbTransaction"/> object representing the transaction for this query.</param>
+        /// <param name="record">The object to insert.</param>
+        /// <param name="tableName">A string representing the name of the table where the records should be inserted.</param>
+        /// <returns>An integer representing the generated auto value for this record (if applicable). If there is no auto value 0 is returned.</returns>
+        public int ExecuteNonQueryInsert<DataType>(DbTransaction transaction, DataType record, string tableName)
+        {
+            List<string> fieldList = new List<string>();
+            List<string> parameterList = new List<string>();
+            List<object> valueList = new List<object>();
 
-                _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
+            _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
+            {
+                fieldList.Add($"[{fieldName}]");
+                parameterList.Add("?");
+                valueList.Add(propInfo.GetValue(record));
+            });
+            if (transaction == null)
+            {
+                using (DbConnection connection = GetConnection())
                 {
-                    fieldList.Add($"[{fieldName}]");
-                    parameterList.Add("?");
-                    valueList.Add(propInfo.GetValue(record));
-                });
-                if (transaction == null)
-                    ExecuteNonQuery($"INSERT INTO {tableName} ({string.Join(",", fieldList.ToArray())}) VALUES ({string.Join(",", parameterList.ToArray())})", valueList.ToArray());
-                else
-                    ExecuteNonQuery(transaction, $"INSERT INTO {tableName} ({string.Join(",", fieldList.ToArray())}) VALUES ({string.Join(",", parameterList.ToArray())})", valueList.ToArray());
+                    connection.Open();
+                    using (DbTransaction scopeTransaction = connection.BeginTransaction())
+                    {
+                        ExecuteNonQuery(scopeTransaction, $"INSERT INTO {tableName} ({string.Join(",", fieldList.ToArray())}) VALUES ({string.Join(",", parameterList.ToArray())})", valueList.ToArray());
+                        int identity = ExecuteScalar(scopeTransaction, "SELECT @@IDENTITY", 0);
+                        scopeTransaction.Commit();
+                        return identity;
+                    }
+                }
             }
+            else
+            {
+                ExecuteNonQuery(transaction, $"INSERT INTO {tableName} ({string.Join(",", fieldList.ToArray())}) VALUES ({string.Join(",", parameterList.ToArray())})", valueList.ToArray());
+                return ExecuteScalar(transaction, "SELECT @@IDENTITY", 0);
+            }
+        }
+        /// <summary>
+        /// Inserts the given object into the given table.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the object to be inserted in the table.</typeparam>
+        /// <param name="record">The object to insert.</param>
+        /// <param name="tableName">A string representing the name of the table where the records should be inserted.</param>
+        /// <returns>An integer representing the generated auto value for this record (if applicable). If there is no auto value 0 is returned.</returns>
+        public int ExecuteNonQueryInsert<DataType>(DataType record, string tableName)
+        {
+            return ExecuteNonQueryInsert(null, record, tableName);
         }
         /// <summary>
         /// 
         /// </summary>
         /// <typeparam name="DataType"></typeparam>
         /// <param name="records"></param>
-        /// <param name="updateCommand"></param>
+        /// <param name="updateCommand">A string representing the update command in the following notation: UPDATE [TableName] SET {0} WHERE [yourParameters].</param>
         /// <param name="parameters"></param>
         public void ExecuteNonQueryUpdate<DataType>(List<DataType> records, string updateCommand, params object[] parameters)
         {
@@ -245,28 +294,54 @@ namespace DatabaseAccess
         /// </summary>
         /// <typeparam name="DataType"></typeparam>
         /// <param name="records"></param>
-        /// <param name="updateCommand"></param>
+        /// <param name="updateCommand">A string representing the update command in the following notation: UPDATE [TableName] SET {0} WHERE [yourParameters].</param>
         /// <param name="parameters"></param>
         public void ExecuteNonQueryUpdate<DataType>(DbTransaction transaction, List<DataType> records, string updateCommand, params object[] parameters)
         {
             foreach (DataType record in records)
-            {
-                Dictionary<string, string> fieldList = new Dictionary<string, string>();
-                List<object> valueList = new List<object>();
-
-                _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
-                {
-                    fieldList.Add(fieldName, "?");
-                    valueList.Add(propInfo.GetValue(record));
-                });
-                valueList.AddRange(parameters); // add where parameters
-                if (transaction == null)
-                    ExecuteNonQuery(string.Format(updateCommand, string.Join(", ", fieldList.Select(x => $"[{x.Key}] = {x.Value}").ToArray())), valueList.ToArray());
-                else
-                    ExecuteNonQuery(transaction, string.Format(updateCommand, string.Join(", ", fieldList.Select(x => $"[{x.Key}] = {x.Value}").ToArray())), valueList.ToArray());
-            }
+                ExecuteNonQueryUpdate(transaction, record, updateCommand, parameters);
         }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="DataType"></typeparam>
+        /// <param name="record"></param>
+        /// <param name="updateCommand">A string representing the update command in the following notation: UPDATE [TableName] SET {0} WHERE [yourParameters].</param>
+        /// <param name="parameters"></param>
+        public void ExecuteNonQueryUpdate<DataType>(DataType record, string updateCommand, params object[] parameters)
+        {
+            ExecuteNonQueryUpdate(null, record, updateCommand, parameters);
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="DataType"></typeparam>
+        /// <param name="transaction"></param>
+        /// <param name="record"></param>
+        /// <param name="updateCommand">A string representing the update command in the following notation: UPDATE [TableName] SET {0} WHERE [yourParameters].</param>
+        /// <param name="parameters"></param>
+        public void ExecuteNonQueryUpdate<DataType>(DbTransaction transaction, DataType record, string updateCommand, params object[] parameters)
+        {
+            Dictionary<string, string> fieldList = new Dictionary<string, string>();
+            List<object> valueList = new List<object>();
 
+            _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
+            {
+                fieldList.Add(fieldName, "?");
+                valueList.Add(propInfo.GetValue(record));
+            });
+            valueList.AddRange(parameters); // add where parameters
+            if (transaction == null)
+                ExecuteNonQuery(string.Format(updateCommand, string.Join(", ", fieldList.Select(x => $"[{x.Key}] = {x.Value}").ToArray())), valueList.ToArray());
+            else
+                ExecuteNonQuery(transaction, string.Format(updateCommand, string.Join(", ", fieldList.Select(x => $"[{x.Key}] = {x.Value}").ToArray())), valueList.ToArray());
+        }
+        /// <summary>
+        /// Checks wether a record exists in the database or not (with the given sql statement).
+        /// </summary>
+        /// <param name="sqlCommand">A string representing an sql statement to check if a record exists in the database. At least one record must be returned by the query to set the return value to true.</param>
+        /// <param name="parameters">An array of parameters for the sql statement.</param>
+        /// <returns>True if the record exists in the table; otherwise false.</returns>
         public bool RecordsExists(string sqlCommand, params object[] parameters)
         {
             return _prepareExecuteConnection<bool>(sqlCommand, (command) =>
@@ -277,7 +352,13 @@ namespace DatabaseAccess
                 }
             }, parameters);
         }
-
+        /// <summary>
+        /// Checks wether a record exists in the database or not (with the given sql statement).
+        /// </summary>
+        /// <param name="transaction">A <see cref="DbTransaction"/> object representing the transaction for the query.</param>
+        /// <param name="sqlCommand">A string representing an sql statement to check if a record exists in the database. At least one record must be returned by the query to set the return value to true.</param>
+        /// <param name="parameters">An array of parameters for the sql statement.</param>
+        /// <returns>True if the record exists in the table; otherwise false.</returns>
         public bool RecordsExists(DbTransaction transaction, string sqlCommand, params object[] parameters)
         {
             return _prepareExecute<bool>(sqlCommand, transaction, (command) =>
@@ -307,6 +388,12 @@ namespace DatabaseAccess
             }, parameters);
         }
 
+        /// <summary>
+        /// Executes the given query and returns the first column first row value.
+        /// </summary>
+        /// <param name="sqlCommand">A string representing the query to execute.</param>
+        /// <param name="parameters">A list of objects representing the query parameters.</param>
+        /// <returns>The requested value by the query.</returns>
         public object ExecuteScalar(string sqlCommand, params object[] parameters)
         {
             return _prepareExecuteConnection(sqlCommand, (command) =>
@@ -315,11 +402,52 @@ namespace DatabaseAccess
             }, parameters);
         }
 
+        /// <summary>
+        /// Executes the given query and returns the first column first row value.
+        /// </summary>
+        /// <param name="transaction">A <see cref="DbTransaction"/> object representing the transaction for the query.</param>
+        /// <param name="sqlCommand">A string representing the query to execute.</param>
+        /// <param name="parameters">A list of objects representing the query parameters.</param>
+        /// <returns>The requested value by the query.</returns>
         public object ExecuteScalar(DbTransaction transaction, string sqlCommand, params object[] parameters)
         {
             return _prepareExecute(sqlCommand, transaction, (command) =>
             {
                 return command.ExecuteScalar();
+            }, parameters);
+        }
+
+        /// <summary>
+        /// Executes the given query and returns the first column first row value.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the value to be returned.</typeparam>
+        /// <param name="sqlCommand">A string representing the query to execute.</param>
+        /// <param name="valueIfNull">An object of type <typeparamref name="DataType"/> representing the return value if null or no record is returned.</param>
+        /// <param name="parameters">A list of objects representing the query parameters.</param>
+        /// <returns>The requested value by the query or the value in valueIfNull if null or no record was returned.</returns>
+
+        public DataType ExecuteScalar<DataType>(string sqlCommand, DataType valueIfNull, params object[] parameters)
+        {
+            return _prepareExecuteConnection(sqlCommand, (command) =>
+            {
+                return IsNull(command.ExecuteScalar(), valueIfNull);
+            }, parameters);
+        }
+
+        /// <summary>
+        /// Executes the given query and returns the first column first row value.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the value to be returned.</typeparam>
+        /// <param name="transaction">A <see cref="DbTransaction"/> object representing the transaction for the query.</param>
+        /// <param name="sqlCommand">A string representing the query to execute.</param>
+        /// <param name="valueIfNull">An object of type <typeparamref name="DataType"/> representing the return value if null or no record is returned.</param>
+        /// <param name="parameters">A list of objects representing the query parameters.</param>
+        /// <returns>The requested value by the query or the value in valueIfNull if null or no record was returned.</returns>
+        public DataType ExecuteScalar<DataType>(DbTransaction transaction, string sqlCommand, DataType valueIfNull, params object[] parameters)
+        {
+            return _prepareExecute(sqlCommand, transaction, (command) =>
+            {
+                return IsNull(command.ExecuteScalar(), valueIfNull);
             }, parameters);
         }
 
