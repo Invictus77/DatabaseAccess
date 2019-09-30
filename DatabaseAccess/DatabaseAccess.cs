@@ -246,7 +246,7 @@ namespace DatabaseAccess
                 fieldList.Add($"[{fieldName}]");
                 parameterList.Add("?");
                 valueList.Add(propInfo.GetValue(record));
-            });
+            }, true);
             if (transaction == null)
             {
                 using (DbConnection connection = GetConnection())
@@ -329,7 +329,7 @@ namespace DatabaseAccess
             {
                 fieldList.Add(fieldName, "?");
                 valueList.Add(propInfo.GetValue(record));
-            });
+            }, true);
             valueList.AddRange(parameters); // add where parameters
             if (transaction == null)
                 ExecuteNonQuery(string.Format(updateCommand, string.Join(", ", fieldList.Select(x => $"[{x.Key}] = {x.Value}").ToArray())), valueList.ToArray());
@@ -455,14 +455,15 @@ namespace DatabaseAccess
         /// Returns all fields which will be evaluated by the object mapper.
         /// </summary>
         /// <typeparam name="DataType">The type of the object to be analyzed.</typeparam>
+        /// <param name="noReadOnly">True if readonly properties should be ommitted; otherwise false. Default is false.</param>
         /// <returns>A <see cref="List{T}"/> containing all fields which will be evaluated by the object mapper separated with comma.</returns>
-        public List<string> GetFieldList<DataType>()
+        public List<string> GetFieldList<DataType>(bool noReadOnly = false)
         {
             List<string> fieldList = new List<string>();
             _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
             {
                 fieldList.Add($"[{fieldName}]");
-            });
+            }, noReadOnly);
 
             return fieldList;
         }
@@ -470,10 +471,11 @@ namespace DatabaseAccess
         /// Returns all fields which will be evaluated by the object mapper separated with comma.
         /// </summary>
         /// <typeparam name="DataType">The type of the object to be analyzed.</typeparam>
+        /// <param name="noReadOnly">True if readonly properties should be ommitted; otherwise false. Default is false.</param>
         /// <returns>A string representing all fields which will be evaluated by the object mapper separated with comma.</returns>
-        public string GetFieldListString<DataType>()
+        public string GetFieldListString<DataType>(bool noReadOnly = false)
         {
-            return string.Join(", ", GetFieldList<DataType>());
+            return string.Join(", ", GetFieldList<DataType>(noReadOnly));
         }
         /// <summary>
         /// Returns the current connection. If no current connection exists a new one will be created.
@@ -564,8 +566,13 @@ namespace DatabaseAccess
 
             list.Add(mapObject);
         }
-
-        private void _ProcessProperties<DataType>(ProcessProperty func)
+        /// <summary>
+        /// Processes all properties of type <typeparamref name="DataType"/> and call the delegate <paramref name="func"/>.
+        /// </summary>
+        /// <typeparam name="DataType">The type of the object which properties should be processed.</typeparam>
+        /// <param name="func">A delegate to the to be called function.</param>
+        /// <param name="noReadOnly">True if readonly properties should be ommitted; otherwise false.</param>
+        private void _ProcessProperties<DataType>(ProcessProperty func, bool noReadOnly = false)
         {
             Type t = typeof(DataType);
 
@@ -573,6 +580,7 @@ namespace DatabaseAccess
             {
                 DefaultValueAttribute defaultAttribute = propInfo.GetCustomAttribute<DefaultValueAttribute>();
                 DatabaseNameAttribute nameAttribute = propInfo.GetCustomAttribute<DatabaseNameAttribute>();
+                ReadOnlyAttribute readonlyAttribute = propInfo.GetCustomAttribute<ReadOnlyAttribute>();
                 if (defaultAttribute != null)
                 {
                     string propName = propInfo.Name;
@@ -582,11 +590,18 @@ namespace DatabaseAccess
                     if (propertyType.GetTypeInfo().IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
                         propertyType = propertyType.GenericTypeArguments[0];
 
-                    func(propName, propInfo, defaultAttribute.Value, propertyType);
+                    if (!(noReadOnly && readonlyAttribute != null && readonlyAttribute.IsReadOnly))
+                        func(propName, propInfo, defaultAttribute.Value, propertyType);
                 }
             }
         }
-
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="fieldName"></param>
+        /// <param name="propInfo"></param>
+        /// <param name="defaultValue"></param>
+        /// <param name="propertyType"></param>
         private delegate void ProcessProperty(string fieldName, PropertyInfo propInfo, object defaultValue, Type propertyType);
 
         private bool FieldExists(IDataReader reader, string name)
