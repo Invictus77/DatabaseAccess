@@ -14,7 +14,7 @@ namespace DatabaseAccess
     /// <summary>
     /// Generic data access class.
     /// </summary>
-    /// <remarks>Support databases: MSACCESS (ODBC)</remarks>
+    /// <remarks>Support databases: MSACCESS (ODBC), SQL Server</remarks>
     public class DatabaseAccess : FieldEvaluator
     {
         #region Variable declaration
@@ -84,7 +84,7 @@ namespace DatabaseAccess
             switch(provider)
             {
                 case Provider.MsAccess: _provider = provider; break;
-                case Provider.SqlClient: throw new NotSupportedException();
+                case Provider.SqlClient: _provider = provider; break;
                 case Provider.SqLite: throw new NotSupportedException();
             }
         }
@@ -487,6 +487,8 @@ namespace DatabaseAccess
 
             if (_provider == Provider.MsAccess)
                 return new System.Data.Odbc.OdbcConnection(_connectionString);
+            else if (_provider == Provider.SqlClient)
+                return new System.Data.SqlClient.SqlConnection(_connectionString);
             throw new NotImplementedException();
         }
         /// <summary>
@@ -533,6 +535,11 @@ namespace DatabaseAccess
         /// <param name="value">The value to be set to the parameter.</param>
         public virtual void ProcessPlatformSpecificParameter(DbParameter parameter, object value)
         {
+            if (_provider == Provider.SqlClient && value == null)
+            {
+                parameter.Value = DBNull.Value;
+                return;
+            }
             parameter.Value = value;
         }
         #endregion
