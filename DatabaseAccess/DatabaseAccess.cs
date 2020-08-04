@@ -90,6 +90,16 @@ namespace DatabaseAccess
         }
         #endregion
 
+        #region Public properties
+        /// <summary>
+        /// Returns the db Provider for this class.
+        /// </summary>
+        public Provider DbProvider
+        {
+            get => _provider;
+        }
+        #endregion
+
         #region Public delegates
         /// <summary>
         /// Function which is called to execute code when command and surrounding objects (connection, transaction, etc.) are prepared.
@@ -97,6 +107,38 @@ namespace DatabaseAccess
         /// <param name="command">An <see cref="IDbCommand"/> object representing the command to execute.</param>
         public delegate TType StatementExecuter<TType>(IDbCommand command);
         #endregion
+
+        #region Public Sql Helper methods (to build correct sql syntax)
+        /// <summary>
+        /// Returns the proper sql notation for DateSerial method.
+        /// </summary>
+        /// <param name="year">The year of the date.</param>
+        /// <param name="month">The month of the date.</param>
+        /// <param name="day">The day of the date.</param>
+        /// <returns>A string representing the proper sql notation to represent this as a date.</returns>
+        public string DateSerial(int year, int month, int day)
+        {
+            switch (_provider)
+            {
+                case Provider.MsAccess: return $"DateSerial({year},{month},{day})";
+                case Provider.SqlClient: return $"CONVERT(DATETIME, '{year}{month:00}{day:00})";
+                default: throw new NotImplementedException();
+            }
+        }
+        /// <summary>
+        /// Returns proper sql notation for Now() method.
+        /// </summary>
+        /// <returns>A string representing the proper sql notation for Now() method.</returns>
+        public string Now()
+        {
+            switch (_provider)
+            {
+                case Provider.MsAccess: return "Now()";
+                case Provider.SqlClient: return "GETDATE()";
+                default: throw new NotImplementedException();
+            }
+        }
+        #endregion  
 
         #region Public methods
         /// <summary>
