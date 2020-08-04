@@ -138,6 +138,21 @@ namespace DatabaseAccess
                 default: throw new NotImplementedException();
             }
         }
+        /// <summary>
+        /// Returns the property IsNull function.
+        /// </summary>
+        /// <param name="fieldName">The fieldname to check.</param>
+        /// <param name="isNullValue">The value if the field is null.</param>
+        /// <returns>A string representing the proper null notation for sql.</returns>
+        public string IsNull(string fieldName, string isNullValue)
+        {
+            switch (_provider)
+            {
+                case Provider.MsAccess: return $"IIF(IsNull({fieldName}), {isNullValue}, {fieldName})";
+                case Provider.SqlClient: return $"IsNull({fieldName}, {isNullValue})";
+                default: throw new NotImplementedException();
+            }
+        }
         #endregion  
 
         #region Public methods
