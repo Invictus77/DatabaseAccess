@@ -301,7 +301,8 @@ namespace DatabaseAccess
             _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
             {
                 fieldList.Add($"[{fieldName}]");
-                parameterList.Add("?");
+                if (_provider == Provider.MsAccess) parameterList.Add("?");
+                else parameterList.Add($"@{fieldName}");
                 valueList.Add(propInfo.GetValue(record));
             }, true);
             if (transaction == null)
@@ -384,7 +385,10 @@ namespace DatabaseAccess
 
             _ProcessProperties<DataType>((fieldName, propInfo, defaultValue, propertyType) =>
             {
-                fieldList.Add(fieldName, "?");
+                if (_provider == Provider.MsAccess)
+                    fieldList.Add(fieldName, "?");
+                else
+                    fieldList.Add(fieldName, $"@{fieldName}");
                 valueList.Add(propInfo.GetValue(record));
             }, true);
             valueList.AddRange(parameters); // add where parameters
