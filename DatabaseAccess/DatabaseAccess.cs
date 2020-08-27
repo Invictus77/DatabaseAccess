@@ -324,7 +324,9 @@ namespace DatabaseAccess
             else
             {
                 ExecuteNonQuery(transaction, $"INSERT INTO {tableName} ({string.Join(",", fieldList.ToArray())}) VALUES ({string.Join(",", parameterList.ToArray())})", valueList.ToArray());
-                return ExecuteScalar(transaction, "SELECT @@IDENTITY", 0);
+                string commandString = "SELECT CAST(@@identity AS INT)";
+                if (_provider == Provider.MsAccess) commandString = "SELECT @@IDENTITY";
+                return ExecuteScalar(transaction, commandString, 0);
             }
         }
         /// <summary>
