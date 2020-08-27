@@ -390,7 +390,7 @@ namespace DatabaseAccess
                 if (_provider == Provider.MsAccess)
                     fieldList.Add(fieldName, "?");
                 else
-                    fieldList.Add(fieldName, $"@{fieldName}");
+                    fieldList.Add(fieldName, $"@{propInfo.Name}");
                 valueList.Add(propInfo.GetValue(record));
             }, true);
             valueList.AddRange(parameters); // add where parameters
