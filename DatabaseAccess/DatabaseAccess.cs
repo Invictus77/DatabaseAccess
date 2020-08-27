@@ -302,7 +302,7 @@ namespace DatabaseAccess
             {
                 fieldList.Add($"[{fieldName}]");
                 if (_provider == Provider.MsAccess) parameterList.Add("?");
-                else parameterList.Add($"@{fieldName}");
+                else parameterList.Add($"@{propInfo.Name}");
                 valueList.Add(propInfo.GetValue(record));
             }, true);
             if (transaction == null)
@@ -313,7 +313,9 @@ namespace DatabaseAccess
                     using (DbTransaction scopeTransaction = connection.BeginTransaction())
                     {
                         ExecuteNonQuery(scopeTransaction, $"INSERT INTO {tableName} ({string.Join(",", fieldList.ToArray())}) VALUES ({string.Join(",", parameterList.ToArray())})", valueList.ToArray());
-                        int identity = ExecuteScalar(scopeTransaction, "SELECT @@IDENTITY", 0);
+                        string commandString = "SELECT CAST(@@identity AS INT)";
+                        if (_provider == Provider.MsAccess) commandString = "SELECT @@IDENTITY";
+                        int identity = ExecuteScalar(scopeTransaction, commandString, 0);
                         scopeTransaction.Commit();
                         return identity;
                     }
