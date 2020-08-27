@@ -121,7 +121,7 @@ namespace DatabaseAccess
             switch (_provider)
             {
                 case Provider.MsAccess: return $"DateSerial({year},{month},{day})";
-                case Provider.SqlClient: return $"CONVERT(DATETIME, '{year}{month:00}{day:00})";
+                case Provider.SqlClient: return $"CONVERT(DATETIME, '{year}{month:00}{day:00}')";
                 default: throw new NotImplementedException();
             }
         }
