@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -21,6 +22,7 @@ namespace DatabaseAccess
         private Provider _provider;
         private string _connectionString;
         private DbConnection _connection;
+        private string _sqlLogFile = string.Empty;
         #endregion
 
         #region Constructor
@@ -29,12 +31,14 @@ namespace DatabaseAccess
         /// </summary>
         /// <param name="provider">The <see cref="Provider"/> enum to define which type of database will be connected.</param>
         /// <param name="connectionString">A string representing the connection string to access the database.</param>
+        /// <param name="sqlLogFile">A string representing a path/filename to log all the sql commands sent with this module.</param>
         /// <exception cref="ArgumentNullException">Thrown if <paramref name="connectionString"/> is set to null or empty string.</exception>
-        public DatabaseAccess(Provider provider, string connectionString)
+        public DatabaseAccess(Provider provider, string connectionString, string sqlLogFile = "")
         {
             if (string.IsNullOrEmpty(connectionString)) throw new ArgumentNullException(nameof(connectionString));
             else _connectionString = connectionString;
 
+            _sqlLogFile = sqlLogFile;
             _SetProvider(provider);
         }
         /// <summary>
@@ -787,9 +791,36 @@ namespace DatabaseAccess
                 parameterList.Add(parameter);
 
             if (parameterList.Count == 0)
+            {
                 Debug.WriteLine(command.CommandText);
+                _WriteToLogFile(command.CommandText);
+            }
             else
+            {
                 Debug.WriteLine("{0}, parameters: {1}", command.CommandText, string.Join(", ", parameterList.Select(x => $"[{x.ParameterName}]: {ToString(x.Value)}").ToList()));
+                _WriteToLogFile($"{command.CommandText}, parameters: {string.Join(", ", parameterList.Select(x => $"[{x.ParameterName}]: {ToString(x.Value)}").ToList())}");
+            }
+        }
+        /// <summary>
+        /// Writes given text to configured logfile.
+        /// </summary>
+        /// <param name="logText">The text to write.</param>
+        private void _WriteToLogFile(string logText)
+        {
+            if (string.IsNullOrEmpty(_sqlLogFile)) return;
+
+            try
+            {
+                using (StreamWriter file = new StreamWriter(_sqlLogFile))
+                {
+                    file.WriteLine($"{DateTime.Now}:{logText}");
+                }
+            }
+            catch (Exception e)
+            {
+                // just catch
+                Debug.WriteLine(e);
+            }
         }
         #endregion
 
