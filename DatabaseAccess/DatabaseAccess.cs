@@ -811,7 +811,7 @@ namespace DatabaseAccess
 
             try
             {
-                using (StreamWriter file = new StreamWriter(_sqlLogFile))
+                using (StreamWriter file = File.AppendText(_sqlLogFile))
                 {
                     file.WriteLine($"{DateTime.Now}:{logText}");
                 }
