@@ -102,6 +102,10 @@ namespace DatabaseAccess
         {
             get => _provider;
         }
+        /// <summary>
+        /// Gets or sets a request id for logging.
+        /// </summary>
+        public string RequestId { get; set; }
         #endregion
 
         #region Public delegates
@@ -813,7 +817,10 @@ namespace DatabaseAccess
             {
                 using (StreamWriter file = File.AppendText(_sqlLogFile))
                 {
-                    file.WriteLine($"{DateTime.Now}:{logText}");
+                    if (string.IsNullOrEmpty(RequestId))
+                        file.WriteLine($"{DateTime.Now}|{logText}");
+                    else
+                        file.WriteLine($"{DateTime.Now}|{RequestId}|{logText}");
                 }
             }
             catch (Exception e)
